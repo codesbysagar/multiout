@@ -2,3 +2,4 @@
 *.test
 .prd
 .vscode*
+build
