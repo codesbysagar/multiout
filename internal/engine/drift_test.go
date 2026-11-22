@@ -53,4 +53,3 @@ func TestDriftControllerConvergence(t *testing.T) {
 		t.Fatalf("drift controller failed to settle near target: fill=%f, target=%d, diff=%f", simulatedFill, target, diff)
 	}
 }
-

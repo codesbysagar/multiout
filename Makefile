@@ -1,4 +1,4 @@
-.PHONY: test vet list tone capture-play
+.PHONY: test vet list tone capture-play sink-play
 
 test:
 	go test -race ./...
@@ -16,3 +16,7 @@ tone:
 # usage: make capture-play C=1 P=1
 capture-play:
 	go run ./cmd/spike capture-play $(C) $(P)
+
+# usage: make sink-play DEVS="1 2"
+sink-play:
+	go run ./cmd/spike sink-play $(DEVS)

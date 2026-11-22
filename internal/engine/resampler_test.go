@@ -63,4 +63,3 @@ func TestLinearResamplerContinuityAcrossCallbacks(t *testing.T) {
 		}
 	}
 }
-

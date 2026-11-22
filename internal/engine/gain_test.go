@@ -69,4 +69,3 @@ func TestGainControllerClampingAndPeak(t *testing.T) {
 		t.Fatalf("expected peak 1.0, got %f", gc.Peak())
 	}
 }
-

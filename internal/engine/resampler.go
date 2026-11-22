@@ -119,4 +119,3 @@ func (r *LinearResampler) Resample(in []float32, out []float32, outFrames int, r
 
 	return consumed
 }
-

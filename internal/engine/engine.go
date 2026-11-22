@@ -39,7 +39,7 @@ type Engine struct {
 
 	mu            sync.RWMutex
 	captureStream audio.Stream
-	captureDevID  string
+	captureDev    audio.Device
 	outputs       map[string]*outputTrack
 	closed        bool
 }
@@ -64,8 +64,9 @@ func NewEngine(backend audio.Backend, cfg audio.Config) *Engine {
 	}
 }
 
-// StartCapture initiates capture from the specified device ID (e.g. monitor sink).
-func (e *Engine) StartCapture(deviceID string) error {
+// StartCapture initiates capture from the specified device (e.g. monitor sink).
+// Returns ErrFeedbackRisk if the capture source is the monitor of an enabled output device (FR-8).
+func (e *Engine) StartCapture(dev audio.Device) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -73,8 +74,15 @@ func (e *Engine) StartCapture(deviceID string) error {
 		return fmt.Errorf("engine is closed")
 	}
 
+	// Feedback protection check (FR-8)
+	for _, track := range e.outputs {
+		if track.enabled.Load() && audio.CheckFeedbackRisk(dev, track.dev) {
+			return fmt.Errorf("%w: cannot capture from %q while outputting to %q", audio.ErrFeedbackRisk, dev.Name, track.dev.Name)
+		}
+	}
+
 	if e.captureStream != nil {
-		if e.captureDevID == deviceID {
+		if e.captureDev.ID == dev.ID {
 			return nil
 		}
 		_ = e.captureStream.Stop()
@@ -82,20 +90,20 @@ func (e *Engine) StartCapture(deviceID string) error {
 		e.captureStream = nil
 	}
 
-	stream, err := e.backend.OpenCapture(deviceID, e.cfg, func(in []float32) {
+	stream, err := e.backend.OpenCapture(dev.ID, e.cfg, func(in []float32) {
 		e.ring.Write(in)
 	})
 	if err != nil {
-		return fmt.Errorf("open capture %s: %w", deviceID, err)
+		return fmt.Errorf("open capture %s: %w", dev.ID, err)
 	}
 
 	if err := stream.Start(); err != nil {
 		_ = stream.Close()
-		return fmt.Errorf("start capture %s: %w", deviceID, err)
+		return fmt.Errorf("start capture %s: %w", dev.ID, err)
 	}
 
 	e.captureStream = stream
-	e.captureDevID = deviceID
+	e.captureDev = dev
 	return nil
 }
 
@@ -108,17 +116,24 @@ func (e *Engine) StopCapture() error {
 		_ = e.captureStream.Stop()
 		err := e.captureStream.Close()
 		e.captureStream = nil
-		e.captureDevID = ""
+		e.captureDev = audio.Device{}
 		return err
 	}
 	return nil
+}
+
+// CaptureDevice returns the active capture device.
+func (e *Engine) CaptureDevice() audio.Device {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.captureDev
 }
 
 // CaptureDeviceID returns the ID of the active capture device.
 func (e *Engine) CaptureDeviceID() string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.captureDevID
+	return e.captureDev.ID
 }
 
 // AddOutput registers and opens an output playback device.
@@ -183,6 +198,7 @@ func (e *Engine) RemoveOutput(deviceID string) error {
 }
 
 // SetOutputEnabled toggles playback for a specific output device.
+// Returns ErrFeedbackRisk if enabling this device would cause feedback with the active capture source (FR-8).
 func (e *Engine) SetOutputEnabled(deviceID string, enabled bool) error {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -191,6 +207,11 @@ func (e *Engine) SetOutputEnabled(deviceID string, enabled bool) error {
 	if !exists {
 		return fmt.Errorf("output device %s not found", deviceID)
 	}
+
+	if enabled && e.captureDev.ID != "" && audio.CheckFeedbackRisk(e.captureDev, track.dev) {
+		return fmt.Errorf("%w: cannot enable %q while capturing from %q", audio.ErrFeedbackRisk, track.dev.Name, e.captureDev.Name)
+	}
+
 	track.enabled.Store(enabled)
 	return nil
 }
@@ -285,4 +306,3 @@ func (e *Engine) Close() error {
 
 	return nil
 }
-

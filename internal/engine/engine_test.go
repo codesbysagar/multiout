@@ -16,7 +16,8 @@ func TestEngineFanOutAndControls(t *testing.T) {
 	defer eng.Close()
 
 	// 1. Start Capture
-	if err := eng.StartCapture("fake:capture:0"); err != nil {
+	capDev := audio.Device{ID: "fake:capture:0", Name: "Monitor of Virtual Sink", Kind: audio.Capture}
+	if err := eng.StartCapture(capDev); err != nil {
 		t.Fatalf("start capture failed: %v", err)
 	}
 	if eng.CaptureDeviceID() != "fake:capture:0" {
@@ -147,5 +148,42 @@ func TestEngineOutputToggling(t *testing.T) {
 	zeroes := make([]float32, 20)
 	if !slices.Equal(out, zeroes) {
 		t.Fatalf("disabled output should produce silence, got %v", out)
+	}
+}
+
+func TestEngineFeedbackProtection(t *testing.T) {
+	fakeBe := audio.NewFakeBackend()
+	defer fakeBe.Close()
+
+	eng := NewEngine(fakeBe, audio.Config{SampleRate: 48000, Channels: 2})
+	defer eng.Close()
+
+	headset := audio.Device{ID: "fake:playback:0", Name: "Fake Headset", Kind: audio.Playback}
+	headsetMonitor := audio.Device{ID: "fake:capture:0", Name: "Monitor of Fake Headset", Kind: audio.Capture}
+
+	// 1. Add output and enable it
+	_, err := eng.AddOutput(headset)
+	if err != nil {
+		t.Fatalf("add output failed: %v", err)
+	}
+
+	// 2. Attempting to start capture from headset monitor while headset is output must fail
+	err = eng.StartCapture(headsetMonitor)
+	if err == nil {
+		t.Fatalf("expected feedback protection error when capturing from monitor of enabled output")
+	}
+
+	// 3. Disable output, then starting capture should succeed
+	if err := eng.SetOutputEnabled(headset.ID, false); err != nil {
+		t.Fatalf("disable output failed: %v", err)
+	}
+	if err := eng.StartCapture(headsetMonitor); err != nil {
+		t.Fatalf("start capture after disable failed: %v", err)
+	}
+
+	// 4. While capture is active, attempting to re-enable headset output must fail
+	err = eng.SetOutputEnabled(headset.ID, true)
+	if err == nil {
+		t.Fatalf("expected feedback protection error when enabling output that matches active capture monitor")
 	}
 }

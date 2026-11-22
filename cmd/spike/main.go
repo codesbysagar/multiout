@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -43,6 +44,11 @@ func main() {
 			usage()
 		}
 		capturePlay(be, os.Args[2], os.Args[3])
+	case "sink-play":
+		if len(os.Args) < 3 {
+			usage()
+		}
+		sinkPlay(be, os.Args[2:])
 	default:
 		usage()
 	}
@@ -192,8 +198,81 @@ func capturePlay(be audio.Backend, capIdxStr, playIdxStr string) {
 	}
 }
 
+func sinkPlay(be audio.Backend, outputIndices []string) {
+	sinkMgr := audio.NewVirtualSinkManager()
+	if err := sinkMgr.Setup(); err != nil {
+		fatal(fmt.Errorf("setup virtual sink: %w", err))
+	}
+	defer func() {
+		fmt.Println("\nRestoring original default audio sink...")
+		_ = sinkMgr.Restore()
+	}()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	// Re-enumerate capture devices after virtual sink setup
+	capDevs, err := be.Devices(audio.Capture)
+	if err != nil {
+		fatal(err)
+	}
+
+	var virtualSinkMonitor audio.Device
+	for _, d := range capDevs {
+		if strings.Contains(strings.ToLower(d.Name), "monitor") && strings.Contains(strings.ToLower(d.Name), "multiout") {
+			virtualSinkMonitor = d
+			break
+		}
+	}
+	if virtualSinkMonitor.ID == "" {
+		fatal(fmt.Errorf("could not find monitor of virtual sink in capture devices"))
+	}
+
+	playDevs, err := be.Devices(audio.Playback)
+	if err != nil {
+		fatal(err)
+	}
+
+	eng := engine.NewEngine(be, audio.Config{SampleRate: 48000, Channels: 2})
+	defer eng.Close()
+
+	if err := eng.StartCapture(virtualSinkMonitor); err != nil {
+		fatal(fmt.Errorf("start capture from virtual sink: %w", err))
+	}
+
+	for _, idxStr := range outputIndices {
+		idx, err := strconv.Atoi(idxStr)
+		if err != nil || idx < 0 || idx >= len(playDevs) {
+			fatal(fmt.Errorf("invalid playback device index %q: must be between 0 and %d", idxStr, len(playDevs)-1))
+		}
+		if _, err := eng.AddOutput(playDevs[idx]); err != nil {
+			fatal(fmt.Errorf("add output %s: %w", playDevs[idx].Name, err))
+		}
+		fmt.Printf("Routing audio to output [%d]: %s\n", idx, playDevs[idx].Name)
+	}
+
+	fmt.Println("\nVirtual sink 'multiout' active. Play video/audio in browser or VLC!")
+	fmt.Println("Audio will play through your selected earphones simultaneously while laptop speakers stay silent.")
+	fmt.Println("Press Ctrl+C to stop and restore normal desktop audio.")
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-sigCh:
+			return
+		case <-ticker.C:
+			states := eng.Outputs()
+			for _, s := range states {
+				fmt.Printf("[%s] fill=%d peak=%.2f underruns=%d overruns=%d\n", s.Name, s.Fill, s.Peak, s.Underruns, s.Overruns)
+			}
+		}
+	}
+}
+
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: spike list | spike tone <playbackIndexA> <playbackIndexB> | spike capture-play <captureIndex> <playbackIndex>")
+	fmt.Fprintln(os.Stderr, "usage: spike list | spike tone <A> <B> | spike capture-play <cap> <play> | spike sink-play <out1> <out2> ...")
 	os.Exit(2)
 }
 

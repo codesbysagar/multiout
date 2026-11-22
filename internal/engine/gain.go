@@ -120,4 +120,3 @@ func (gc *GainController) Apply(samples []float32, channels int) {
 	gc.currentGain = cur
 	gc.peak.Store(math.Float32bits(maxAbs))
 }
-
