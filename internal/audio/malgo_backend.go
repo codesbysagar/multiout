@@ -102,3 +102,36 @@ func (b *MalgoBackend) OpenPlayback(deviceID string, cfg Config, fill FillFunc) 
 	}
 	return &malgoStream{dev: dev}, nil
 }
+
+func (b *MalgoBackend) OpenCapture(deviceID string, cfg Config, onData CaptureFunc) (Stream, error) {
+	b.mu.Lock()
+	info, ok := b.known[deviceID]
+	b.mu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("unknown device %q (call Devices first)", deviceID)
+	}
+
+	dc := malgo.DefaultDeviceConfig(malgo.Capture)
+	dc.Capture.Format = malgo.FormatF32
+	dc.Capture.Channels = uint32(cfg.Channels)
+	dc.SampleRate = uint32(cfg.SampleRate)
+	dc.Capture.DeviceID = info.ID.Pointer()
+
+	channels := cfg.Channels
+	callbacks := malgo.DeviceCallbacks{
+		Data: func(_, in []byte, frames uint32) {
+			n := int(frames) * channels
+			if n == 0 || len(in) < n*4 {
+				return
+			}
+			// Zero-copy view of the input buffer as float32.
+			onData(unsafe.Slice((*float32)(unsafe.Pointer(&in[0])), n))
+		},
+	}
+
+	dev, err := malgo.InitDevice(b.ctx.Context, dc, callbacks)
+	if err != nil {
+		return nil, fmt.Errorf("open capture %q: %w", deviceID, err)
+	}
+	return &malgoStream{dev: dev}, nil
+}

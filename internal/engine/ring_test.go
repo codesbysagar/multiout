@@ -110,6 +110,7 @@ func TestOversizedWriteKeepsNewest(t *testing.T) {
 	rd.SetMinFill(2)
 
 	r.Write([]float32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}) // bigger than the ring
+	readN(rd, 10)                                     // resyncs to minFill behind head
 	r.Write([]float32{11, 12})
 
 	if got := readN(rd, 10); !slices.Equal(got, []float32{9, 10}) {

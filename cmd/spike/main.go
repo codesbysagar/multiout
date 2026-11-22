@@ -1,18 +1,22 @@
-// Command spike is the milestone-1 experiment: list audio devices and play a
-// different test tone to two playback devices at the same time.
+// Command spike is the milestone-1/milestone-2 experiment: list audio devices,
+// play a test tone to two playback devices, or pipe captured audio into a playback device.
 //
 //	go run ./cmd/spike list
 //	go run ./cmd/spike tone <playbackIndexA> <playbackIndexB>
+//	go run ./cmd/spike capture-play <captureIndex> <playbackIndex>
 package main
 
 import (
 	"fmt"
 	"math"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"multiout/internal/audio"
+	"multiout/internal/engine"
 )
 
 func main() {
@@ -34,6 +38,11 @@ func main() {
 			usage()
 		}
 		tone(be, os.Args[2], os.Args[3])
+	case "capture-play":
+		if len(os.Args) != 4 {
+			usage()
+		}
+		capturePlay(be, os.Args[2], os.Args[3])
 	default:
 		usage()
 	}
@@ -103,8 +112,65 @@ func sine(freq float64, cfg audio.Config, gain float32) audio.FillFunc {
 	}
 }
 
+func capturePlay(be audio.Backend, capIdx, playIdx string) {
+	if _, err := be.Devices(audio.Capture); err != nil {
+		fatal(err)
+	}
+	if _, err := be.Devices(audio.Playback); err != nil {
+		fatal(err)
+	}
+
+	cfg := audio.Config{SampleRate: 48000, Channels: 2}
+	// 2 seconds capacity
+	r := engine.NewRing(cfg.SampleRate * cfg.Channels * 2)
+	rd := r.NewReader()
+
+	capStream, err := be.OpenCapture("capture:"+capIdx, cfg, func(in []float32) {
+		r.Write(in)
+	})
+	if err != nil {
+		fatal(fmt.Errorf("open capture: %w", err))
+	}
+	defer capStream.Close()
+
+	playStream, err := be.OpenPlayback("playback:"+playIdx, cfg, func(out []float32) {
+		n := rd.Read(out)
+		for i := n; i < len(out); i++ {
+			out[i] = 0 // fill underrun with silence
+		}
+	})
+	if err != nil {
+		fatal(fmt.Errorf("open playback: %w", err))
+	}
+	defer playStream.Close()
+
+	if err := capStream.Start(); err != nil {
+		fatal(err)
+	}
+	if err := playStream.Start(); err != nil {
+		fatal(err)
+	}
+
+	fmt.Printf("Streaming capture:%s -> playback:%s. Press Ctrl+C to stop.\n", capIdx, playIdx)
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-sigCh:
+			fmt.Printf("\nStopping... Overruns: %d\n", rd.Overruns())
+			return
+		case <-ticker.C:
+			fmt.Printf("Status: buffer fill=%d samples, overruns=%d\n", rd.Fill(), rd.Overruns())
+		}
+	}
+}
+
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: spike list | spike tone <playbackIndexA> <playbackIndexB>")
+	fmt.Fprintln(os.Stderr, "usage: spike list | spike tone <playbackIndexA> <playbackIndexB> | spike capture-play <captureIndex> <playbackIndex>")
 	os.Exit(2)
 }
 

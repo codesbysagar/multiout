@@ -37,17 +37,21 @@ type Config struct {
 // Keep it fast and allocation-free: copy from a buffer, nothing else.
 type FillFunc func(out []float32)
 
-// Stream is an open playback stream.
+// CaptureFunc is called on the audio thread when captured samples are available.
+// Keep it fast and allocation-free: copy to a buffer, nothing else.
+type CaptureFunc func(in []float32)
+
+// Stream is an open stream (playback or capture).
 type Stream interface {
 	Start() error
 	Stop() error
 	Close() error
 }
 
-// Backend abstracts the OS audio system. Capture streams will be added here
-// once the playback spike is verified.
+// Backend abstracts the OS audio system.
 type Backend interface {
 	Devices(kind Kind) ([]Device, error)
 	OpenPlayback(deviceID string, cfg Config, fill FillFunc) (Stream, error)
+	OpenCapture(deviceID string, cfg Config, onData CaptureFunc) (Stream, error)
 	Close() error
 }
