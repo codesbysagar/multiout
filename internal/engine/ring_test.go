@@ -163,3 +163,39 @@ func TestConcurrentWriterReader(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestReaderPeekAndAdvance(t *testing.T) {
+	r := NewRing(16)
+	rd := r.NewReader()
+
+	r.Write([]float32{10, 20, 30, 40})
+
+	peekBuf := make([]float32, 2)
+	n := rd.Peek(peekBuf)
+	if n != 2 || !slices.Equal(peekBuf, []float32{10, 20}) {
+		t.Fatalf("peek got %v", peekBuf)
+	}
+
+	// Peek should not have moved cursor
+	if rd.Fill() != 4 {
+		t.Fatalf("fill should be 4, got %d", rd.Fill())
+	}
+
+	// Second peek should return identical data
+	n2 := rd.Peek(peekBuf)
+	if n2 != 2 || !slices.Equal(peekBuf, []float32{10, 20}) {
+		t.Fatalf("second peek got %v", peekBuf)
+	}
+
+	// Advance by 2
+	rd.Advance(2)
+	if rd.Fill() != 2 {
+		t.Fatalf("fill should be 2 after advance, got %d", rd.Fill())
+	}
+
+	// Peek now returns next samples
+	rd.Peek(peekBuf)
+	if !slices.Equal(peekBuf, []float32{30, 40}) {
+		t.Fatalf("peek after advance got %v", peekBuf)
+	}
+}

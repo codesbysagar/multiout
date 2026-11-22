@@ -97,10 +97,9 @@ func (rd *Reader) Overruns() uint64 {
 	return rd.overruns
 }
 
-// Read copies up to len(dst) samples into dst and returns how many were
-// copied. It returns fewer (possibly zero) when the buffered data is within
-// the held-back delay; the caller should fill the remainder with silence.
-func (rd *Reader) Read(dst []float32) int {
+// Peek copies up to len(dst) samples into dst without advancing the reader's
+// position. It returns how many samples were copied.
+func (rd *Reader) Peek(dst []float32) int {
 	r := rd.ring
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -127,6 +126,26 @@ func (rd *Reader) Read(dst []float32) int {
 	idx := int(rd.pos % c)
 	k := copy(dst[:n], r.buf[idx:])
 	copy(dst[k:n], r.buf)
-	rd.pos += uint64(n)
+	return n
+}
+
+// Advance advances the reader's position by samples.
+func (rd *Reader) Advance(samples int) {
+	if samples <= 0 {
+		return
+	}
+	rd.ring.mu.Lock()
+	defer rd.ring.mu.Unlock()
+	rd.pos += uint64(samples)
+}
+
+// Read copies up to len(dst) samples into dst and advances the reader cursor.
+// It returns fewer (possibly zero) when the buffered data is within
+// the held-back delay; the caller should fill the remainder with silence.
+func (rd *Reader) Read(dst []float32) int {
+	n := rd.Peek(dst)
+	if n > 0 {
+		rd.Advance(n)
+	}
 	return n
 }

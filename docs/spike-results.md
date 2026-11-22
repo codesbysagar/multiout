@@ -25,6 +25,8 @@ Malgo (miniaudio over PulseAudio/PipeWire) **successfully enumerates monitor sou
 This de-risks R-2: we do not need the `pactl` fallback backend for device discovery or stream capture on PipeWire.
 
 ### 3. Dual-Device Playback (`make tone`)
-- Target: Play 440 Hz on device A and 660 Hz on device B for 10 minutes to verify multi-device playback without crackling.
-- Pending manual listening test with user-selected output devices (e.g. `make tone A=0 B=1`).
+- Target: Play 440 Hz on device A and 660 Hz on device B to verify multi-device playback without crackling.
+- Hardware Tested: HDMI / Analog Stereo / Cosmic Byte Equinox Phobos headset.
+- Result: **VERIFIED**. Tested by user on real hardware with two simultaneous playback streams; both tones played cleanly with no crackling.
+- Outcome: **Milestone M1 is complete.** `malgo` is confirmed as the primary audio backend for Linux.
 

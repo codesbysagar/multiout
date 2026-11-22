@@ -74,4 +74,3 @@ func TestFakeBackendStreamIO(t *testing.T) {
 		t.Fatalf("generated %v, want %v", generated, expected)
 	}
 }
-

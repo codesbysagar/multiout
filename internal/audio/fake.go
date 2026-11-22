@@ -170,4 +170,3 @@ func (f *FakeBackend) GetCaptureStream(deviceID string) *FakeStream {
 	defer f.mu.Unlock()
 	return f.captureStreams[deviceID]
 }
-
