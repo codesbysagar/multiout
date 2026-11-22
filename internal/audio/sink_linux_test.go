@@ -49,4 +49,3 @@ func TestParseNodeIDFromPwCli(t *testing.T) {
 		t.Fatalf("expected node ID 77, got %d", id)
 	}
 }
-

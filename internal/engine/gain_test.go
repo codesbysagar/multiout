@@ -69,3 +69,38 @@ func TestGainControllerClampingAndPeak(t *testing.T) {
 		t.Fatalf("expected peak 1.0, got %f", gc.Peak())
 	}
 }
+
+func TestDBConversionsAndBoost(t *testing.T) {
+	// 0 dB is 1.0 unity gain
+	if math.Abs(float64(DBToGain(0.0)-1.0)) > 1e-3 {
+		t.Errorf("expected 0 dB to be 1.0, got %f", DBToGain(0.0))
+	}
+	if math.Abs(GainToDB(1.0)-0.0) > 1e-3 {
+		t.Errorf("expected 1.0 gain to be 0 dB, got %f", GainToDB(1.0))
+	}
+
+	// +6 dB is approx 2.0x gain
+	gain6 := DBToGain(6.0)
+	if math.Abs(float64(gain6-1.995)) > 0.05 {
+		t.Errorf("expected +6 dB to be ~2.0, got %f", gain6)
+	}
+
+	// +12 dB is approx 4.0x gain
+	gain12 := DBToGain(12.0)
+	if math.Abs(float64(gain12-3.981)) > 0.05 {
+		t.Errorf("expected +12 dB to be ~3.98, got %f", gain12)
+	}
+
+	// -60 dB is silence
+	if DBToGain(-60.0) != 0.0 {
+		t.Errorf("expected -60 dB to be 0.0, got %f", DBToGain(-60.0))
+	}
+
+	// Verify gain controller supports +6 dB boost
+	gc := NewGainController(2.0, 1)
+	samples := []float32{0.25, -0.25}
+	gc.Apply(samples, 2)
+	if math.Abs(float64(samples[0]-0.5)) > 1e-3 {
+		t.Errorf("expected sample 0.25 boosted 2x to be 0.5, got %f", samples[0])
+	}
+}

@@ -16,13 +16,13 @@ type GainController struct {
 	rampStep    float32       // change in gain per frame
 }
 
-// NewGainController creates a controller with an initial volume (0.0 to 1.0)
+// NewGainController creates a controller with an initial volume (0.0 to 4.0, up to +12 dB)
 // and a ramp duration (e.g., 10ms = 480 frames at 48kHz).
 func NewGainController(initialVolume float32, rampFrames int) *GainController {
 	if initialVolume < 0 {
 		initialVolume = 0
-	} else if initialVolume > 1 {
-		initialVolume = 1
+	} else if initialVolume > 4.0 {
+		initialVolume = 4.0
 	}
 	if rampFrames <= 0 {
 		rampFrames = 480 // 10ms at 48kHz
@@ -36,14 +36,38 @@ func NewGainController(initialVolume float32, rampFrames int) *GainController {
 	return gc
 }
 
-// SetVolume sets the target volume between 0.0 and 1.0.
+// SetVolume sets the target volume between 0.0 and 4.0 (up to +12 dB boost).
 func (gc *GainController) SetVolume(v float32) {
 	if v < 0 {
 		v = 0
-	} else if v > 1 {
-		v = 1
+	} else if v > 4.0 {
+		v = 4.0
 	}
 	gc.targetGain.Store(math.Float32bits(v))
+}
+
+// DBToGain converts a decibel level (-60.0 to +12.0 dB) to a linear amplitude gain.
+// Values <= -59.5 dB are treated as silence (0.0).
+func DBToGain(db float64) float32 {
+	if db <= -59.5 {
+		return 0.0
+	}
+	return float32(math.Pow(10, db/20.0))
+}
+
+// GainToDB converts a linear amplitude gain to a decibel level (-60.0 to +12.0 dB).
+func GainToDB(gain float32) float64 {
+	if gain <= 0.001 {
+		return -60.0
+	}
+	db := 20.0 * math.Log10(float64(gain))
+	if db > 12.0 {
+		return 12.0
+	}
+	if db < -60.0 {
+		return -60.0
+	}
+	return db
 }
 
 // Volume returns the current target volume.

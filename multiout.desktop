@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Multiout
+GenericName=Multi-Device Audio Output
+Comment=Play audio to multiple earphones simultaneously with drift compensation
+Exec=/home/codesbysagar/.local/bin/multiout
+Icon=multiout
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+StartupNotify=true
+Keywords=audio;sound;headphones;earphones;headset;dual;multi;sink;
+

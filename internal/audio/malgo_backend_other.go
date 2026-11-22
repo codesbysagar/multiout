@@ -27,4 +27,3 @@ func (b *MalgoBackend) OpenCapture(deviceID string, cfg Config, onData CaptureFu
 func (b *MalgoBackend) Close() error {
 	return nil
 }
-
