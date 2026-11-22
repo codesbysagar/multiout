@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -222,13 +223,19 @@ func parseDefaultSinkFromWpctl(statusOutput string) (int, error) {
 	return 0, fmt.Errorf("no default sink found in wpctl status")
 }
 
-// Helper: find PipeWire node ID for a given node.name
+// Helper: find PipeWire node ID for a given node.name with retry
 func findPipeWireNodeID(nodeName string) (int, error) {
-	out, err := exec.Command("pw-cli", "list-objects", "Node").Output()
-	if err != nil {
-		return 0, err
+	for attempt := 0; attempt < 10; attempt++ {
+		out, err := exec.Command("pw-cli", "list-objects", "Node").Output()
+		if err == nil {
+			id, err := parseNodeIDFromPwCli(string(out), nodeName)
+			if err == nil && id > 0 {
+				return id, nil
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
-	return parseNodeIDFromPwCli(string(out), nodeName)
+	return 0, fmt.Errorf("node %q not found in pipewire after retries", nodeName)
 }
 
 func parseNodeIDFromPwCli(output, nodeName string) (int, error) {

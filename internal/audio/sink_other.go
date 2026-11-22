@@ -29,4 +29,3 @@ func (m *NonLinuxVirtualSinkManager) Restore() error {
 func (m *NonLinuxVirtualSinkManager) CleanupStale() error {
 	return nil
 }
-

@@ -25,30 +25,39 @@ func main() {
 		usage()
 	}
 
-	be, err := audio.NewMalgoBackend()
-	if err != nil {
-		fatal(err)
-	}
-	defer be.Close()
-
 	switch os.Args[1] {
 	case "list":
+		be, err := audio.NewMalgoBackend()
+		if err != nil {
+			fatal(err)
+		}
+		defer be.Close()
 		list(be)
 	case "tone":
 		if len(os.Args) != 4 {
 			usage()
 		}
+		be, err := audio.NewMalgoBackend()
+		if err != nil {
+			fatal(err)
+		}
+		defer be.Close()
 		tone(be, os.Args[2], os.Args[3])
 	case "capture-play":
 		if len(os.Args) != 4 {
 			usage()
 		}
+		be, err := audio.NewMalgoBackend()
+		if err != nil {
+			fatal(err)
+		}
+		defer be.Close()
 		capturePlay(be, os.Args[2], os.Args[3])
 	case "sink-play":
 		if len(os.Args) < 3 {
 			usage()
 		}
-		sinkPlay(be, os.Args[2:])
+		sinkPlay(os.Args[2:])
 	default:
 		usage()
 	}
@@ -198,7 +207,7 @@ func capturePlay(be audio.Backend, capIdxStr, playIdxStr string) {
 	}
 }
 
-func sinkPlay(be audio.Backend, outputIndices []string) {
+func sinkPlay(outputIndices []string) {
 	sinkMgr := audio.NewVirtualSinkManager()
 	if err := sinkMgr.Setup(); err != nil {
 		fatal(fmt.Errorf("setup virtual sink: %w", err))
@@ -207,6 +216,12 @@ func sinkPlay(be audio.Backend, outputIndices []string) {
 		fmt.Println("\nRestoring original default audio sink...")
 		_ = sinkMgr.Restore()
 	}()
+
+	be, err := audio.NewMalgoBackend()
+	if err != nil {
+		fatal(err)
+	}
+	defer be.Close()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)

@@ -42,4 +42,3 @@ func CheckFeedbackRisk(captureDev Device, playbackDev Device) bool {
 	// Direct match of playback device name within the monitor name
 	return strings.Contains(capName, playName)
 }
-
