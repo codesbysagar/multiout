@@ -67,18 +67,23 @@ func list(be audio.Backend) {
 }
 
 func tone(be audio.Backend, a, b string) {
-	if _, err := be.Devices(audio.Playback); err != nil { // populate IDs
+	devs, err := be.Devices(audio.Playback)
+	if err != nil { // populate IDs
 		fatal(err)
 	}
 	cfg := audio.Config{SampleRate: 48000, Channels: 2}
 
 	var streams []audio.Stream
-	for i, idx := range []string{a, b} {
-		if _, err := strconv.Atoi(idx); err != nil {
-			fatal(fmt.Errorf("device index %q is not a number", idx))
+	for i, idxStr := range []string{a, b} {
+		idx, err := strconv.Atoi(idxStr)
+		if err != nil {
+			fatal(fmt.Errorf("device index %q is not a number", idxStr))
+		}
+		if idx < 0 || idx >= len(devs) {
+			fatal(fmt.Errorf("device index %d is out of range: only %d playback device(s) available (0 to %d). Run 'make list' to inspect", idx, len(devs), len(devs)-1))
 		}
 		freq := []float64{440, 660}[i] // different pitch per device
-		s, err := be.OpenPlayback("playback:"+idx, cfg, sine(freq, cfg, 0.1))
+		s, err := be.OpenPlayback("playback:"+idxStr, cfg, sine(freq, cfg, 0.1))
 		if err != nil {
 			fatal(err)
 		}
@@ -112,12 +117,30 @@ func sine(freq float64, cfg audio.Config, gain float32) audio.FillFunc {
 	}
 }
 
-func capturePlay(be audio.Backend, capIdx, playIdx string) {
-	if _, err := be.Devices(audio.Capture); err != nil {
+func capturePlay(be audio.Backend, capIdxStr, playIdxStr string) {
+	capDevs, err := be.Devices(audio.Capture)
+	if err != nil {
 		fatal(err)
 	}
-	if _, err := be.Devices(audio.Playback); err != nil {
+	playDevs, err := be.Devices(audio.Playback)
+	if err != nil {
 		fatal(err)
+	}
+
+	capIdx, err := strconv.Atoi(capIdxStr)
+	if err != nil {
+		fatal(fmt.Errorf("capture device index %q is not a number", capIdxStr))
+	}
+	if capIdx < 0 || capIdx >= len(capDevs) {
+		fatal(fmt.Errorf("capture index %d out of range: %d capture device(s) found (run 'make list')", capIdx, len(capDevs)))
+	}
+
+	playIdx, err := strconv.Atoi(playIdxStr)
+	if err != nil {
+		fatal(fmt.Errorf("playback device index %q is not a number", playIdxStr))
+	}
+	if playIdx < 0 || playIdx >= len(playDevs) {
+		fatal(fmt.Errorf("playback index %d out of range: %d playback device(s) found (run 'make list')", playIdx, len(playDevs)))
 	}
 
 	cfg := audio.Config{SampleRate: 48000, Channels: 2}
@@ -125,7 +148,7 @@ func capturePlay(be audio.Backend, capIdx, playIdx string) {
 	r := engine.NewRing(cfg.SampleRate * cfg.Channels * 2)
 	rd := r.NewReader()
 
-	capStream, err := be.OpenCapture("capture:"+capIdx, cfg, func(in []float32) {
+	capStream, err := be.OpenCapture("capture:"+capIdxStr, cfg, func(in []float32) {
 		r.Write(in)
 	})
 	if err != nil {
@@ -133,7 +156,7 @@ func capturePlay(be audio.Backend, capIdx, playIdx string) {
 	}
 	defer capStream.Close()
 
-	playStream, err := be.OpenPlayback("playback:"+playIdx, cfg, func(out []float32) {
+	playStream, err := be.OpenPlayback("playback:"+playIdxStr, cfg, func(out []float32) {
 		n := rd.Read(out)
 		for i := n; i < len(out); i++ {
 			out[i] = 0 // fill underrun with silence
@@ -151,7 +174,7 @@ func capturePlay(be audio.Backend, capIdx, playIdx string) {
 		fatal(err)
 	}
 
-	fmt.Printf("Streaming capture:%s -> playback:%s. Press Ctrl+C to stop.\n", capIdx, playIdx)
+	fmt.Printf("Streaming capture:%s -> playback:%s. Press Ctrl+C to stop.\n", capIdxStr, playIdxStr)
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
