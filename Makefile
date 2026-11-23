@@ -1,6 +1,6 @@
 .PHONY: test vet list tone capture-play sink-play build run install deb exe installer win-install
 
-VERSION ?= 1.0.0
+VERSION ?= 1.1.0
 DEB_NAME = multiout_$(VERSION)_amd64
 
 test:

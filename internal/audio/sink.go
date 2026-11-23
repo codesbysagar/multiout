@@ -55,3 +55,23 @@ func CheckFeedbackRisk(captureDev Device, playbackDev Device) bool {
 
 	return false
 }
+
+// DetectVirtualSink checks a list of playback devices and returns the first virtual audio cable found.
+func DetectVirtualSink(devs []Device) (Device, bool) {
+	virtualKeywords := []string{
+		"cable input",
+		"vb-audio",
+		"virtual audio",
+		"virtual cable",
+		"multiout",
+	}
+	for _, d := range devs {
+		lower := strings.ToLower(d.Name)
+		for _, kw := range virtualKeywords {
+			if strings.Contains(lower, kw) {
+				return d, true
+			}
+		}
+	}
+	return Device{}, false
+}

@@ -96,7 +96,7 @@ func (c *Controller) RefreshDevices() error {
 	}
 
 	if vSink, found := audio.DetectVirtualSink(c.playbackDevs); found {
-		if winSinkMgr, ok := c.sinkMgr.(*audio.WindowsVirtualSinkManager); ok {
+		if winSinkMgr, ok := c.sinkMgr.(interface{ SetDetectedSink(string) }); ok {
 			winSinkMgr.SetDetectedSink(vSink.Name)
 		}
 		c.Logger.Log("[Audio] Virtual audio sink detected: \"%s\"", vSink.Name)
