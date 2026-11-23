@@ -30,4 +30,26 @@ func TestCheckFeedbackRisk(t *testing.T) {
 	if CheckFeedbackRisk(capMic, playDev) {
 		t.Fatalf("expected no feedback risk for microphone capture")
 	}
+
+	// 5. Windows direct loopback: feedback risk
+	capLoopbackDirect := Device{ID: "loopback:1", Name: "Ryzen HD Audio Controller Analog Stereo (Loopback)", Kind: Capture}
+	if !CheckFeedbackRisk(capLoopbackDirect, playDev) {
+		t.Fatalf("expected feedback risk for Windows loopback on same device")
+	}
+
+	// 6. Windows other loopback: no feedback risk
+	capLoopbackOther := Device{ID: "loopback:0", Name: "HDA NVidia Digital Stereo (HDMI) (Loopback)", Kind: Capture}
+	if CheckFeedbackRisk(capLoopbackOther, playDev) {
+		t.Fatalf("expected no feedback risk for Windows loopback on different device")
+	}
+
+	// 7. Windows default system audio loopback: risk if playback device is default
+	playDevDefault := Device{ID: "playback:1", Name: "Ryzen HD Audio Controller Analog Stereo", Kind: Playback, IsDefault: true}
+	capSystemDefault := Device{ID: "loopback:default", Name: "System Audio (Default Output)", Kind: Capture, IsDefault: true}
+	if !CheckFeedbackRisk(capSystemDefault, playDevDefault) {
+		t.Fatalf("expected feedback risk for System Audio default loopback and default playback device")
+	}
+	if CheckFeedbackRisk(capSystemDefault, playDev) {
+		t.Fatalf("expected no feedback risk for System Audio default loopback and non-default playback device")
+	}
 }

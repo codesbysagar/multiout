@@ -82,9 +82,10 @@ func (c *Controller) RefreshDevices() error {
 
 	// Default capture selection:
 	if c.selectedCap.ID == "" && len(cDevs) > 0 {
-		// Prefer monitor of default sink or first monitor
+		// Prefer monitor of default sink, system audio, or first monitor/loopback
 		for _, d := range cDevs {
-			if d.IsDefault || strings.Contains(strings.ToLower(d.Name), "monitor") {
+			lower := strings.ToLower(d.Name)
+			if d.IsDefault || strings.Contains(lower, "system audio") || strings.Contains(lower, "monitor") {
 				c.selectedCap = d
 				break
 			}
@@ -94,8 +95,44 @@ func (c *Controller) RefreshDevices() error {
 		}
 	}
 
+	if vSink, found := audio.DetectVirtualSink(c.playbackDevs); found {
+		if winSinkMgr, ok := c.sinkMgr.(*audio.WindowsVirtualSinkManager); ok {
+			winSinkMgr.SetDetectedSink(vSink.Name)
+		}
+		c.Logger.Log("[Audio] Virtual audio sink detected: \"%s\"", vSink.Name)
+	}
+
 	c.Logger.Log("[Audio] Discovered %d playback and %d capture devices.", len(pDevs), len(cDevs))
 	return nil
+}
+
+// HasVirtualSink reports whether a virtual audio sink (e.g. VB-Cable or PipeWire) is active or available.
+func (c *Controller) HasVirtualSink() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.sinkMgr != nil && c.sinkMgr.VirtualSinkName() != "" {
+		return true
+	}
+	_, found := audio.DetectVirtualSink(c.playbackDevs)
+	return found
+}
+
+// VirtualSinkName returns the name of any detected or active virtual audio sink.
+func (c *Controller) VirtualSinkName() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.sinkMgr != nil && c.sinkMgr.VirtualSinkName() != "" {
+		return c.sinkMgr.VirtualSinkName()
+	}
+	if vSink, found := audio.DetectVirtualSink(c.playbackDevs); found {
+		return vSink.Name
+	}
+	return ""
+}
+
+// OpenSoundSettings launches the system sound settings dialog.
+func (c *Controller) OpenSoundSettings() error {
+	return OpenSystemSoundSettings()
 }
 
 // PlaybackDevices returns currently enumerated playback devices.
@@ -190,7 +227,11 @@ func (c *Controller) Start() error {
 	}
 	c.mu.Unlock()
 
-	c.Logger.Log("[Engine] Setting up PipeWire virtual sink...")
+	if c.sinkMgr.VirtualSinkName() != "" {
+		c.Logger.Log("[Engine] Setting up %s virtual sink...", c.sinkMgr.VirtualSinkName())
+	} else {
+		c.Logger.Log("[Engine] Initializing audio loopback capture...")
+	}
 	// 1. Setup virtual sink (FR-7)
 	if err := c.sinkMgr.Setup(); err != nil {
 		c.Logger.Log("[Error] Virtual sink setup failed: %v", err)

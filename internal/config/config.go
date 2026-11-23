@@ -36,6 +36,9 @@ func NewDefaultConfig() *Config {
 
 // ConfigFilePath returns the path to multiout/config.json in the user's config directory.
 func ConfigFilePath() (string, error) {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, "multiout", "config.json"), nil
+	}
 	configDir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err

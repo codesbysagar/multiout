@@ -1,4 +1,4 @@
-.PHONY: test vet list tone capture-play sink-play build run install deb exe
+.PHONY: test vet list tone capture-play sink-play build run install deb exe installer win-install
 
 VERSION ?= 1.0.0
 DEB_NAME = multiout_$(VERSION)_amd64
@@ -58,12 +58,28 @@ deb: build
 
 exe:
 	@if ! command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then \
-		echo "Error: x86_64-w64-mingw32-gcc not found. Please run: sudo apt install -y gcc-mingw-w64-x86-64"; \
-		exit 1; \
+		echo "Building with local gcc/go..."; \
+		go build -ldflags="-H=windowsgui -s -w" -o bin/multiout.exe ./cmd/multiout; \
+	else \
+		mkdir -p bin; \
+		CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc go build -ldflags="-H=windowsgui -s -w" -o bin/multiout.exe ./cmd/multiout; \
 	fi
-	mkdir -p bin
-	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc go build -ldflags="-H=windowsgui -s -w" -o bin/multiout.exe ./cmd/multiout
 	@echo "Created Windows executable: bin/multiout.exe"
+
+installer: exe
+	@if command -v iscc >/dev/null 2>&1; then \
+		iscc installer/multiout.iss; \
+		echo "Created Inno Setup installer: bin/multiout_setup_x64.exe"; \
+	elif [ -f "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" ]; then \
+		"C:/Program Files (x86)/Inno Setup 6/ISCC.exe" installer/multiout.iss; \
+		echo "Created Inno Setup installer: bin/multiout_setup_x64.exe"; \
+	else \
+		echo "Inno Setup compiler (iscc) not found in PATH or standard directory."; \
+		echo "Install Inno Setup from https://jrsoftware.org/isinfo.php to compile installer/multiout.iss"; \
+	fi
+
+win-install: exe
+	powershell -ExecutionPolicy Bypass -File ./scripts/install-windows.ps1
 
 list:
 	go run ./cmd/spike list

@@ -103,11 +103,28 @@ Pre-built binaries and packages for **Linux** and **Windows** are available on t
    ```
 4. Launch **Multiout** from your desktop application menu or by running `multiout` in terminal.
 
-### Windows (.exe Standalone)
+### Windows (.exe Standalone & Installer)
 
+**Option A: Standalone Executable (Portable)**
 1. Download `multiout.exe` from the [Releases](https://github.com/codesbysagar/multiout/releases) page.
-2. Place `multiout.exe` in any folder of your choice.
-3. Double-click `multiout.exe` to run. No installer or administrative privileges required.
+2. Place `multiout.exe` in any folder of your choice and double-click to run.
+
+**Option B: Windows Installer Setup**
+1. Download `multiout_setup_x64.exe` from [Releases](https://github.com/codesbysagar/multiout/releases).
+2. Run the wizard to install Multiout to your system with Start Menu and Desktop shortcuts.
+
+**Option C: PowerShell Setup (From Source)**
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1 -Build
+```
+
+> [!TIP]
+> **Windows Audio Setup Tip (Avoid Dual-Voice Echo):**
+> On Windows, audio plays directly to your default hardware soundcard. If you route system audio using Multiout to the same device, Windows will play raw audio *plus* Multiout's resampled audio, causing an echo.
+> To route clean audio:
+> 1. Install a free Virtual Audio Cable, such as **[VB-Audio Cable](https://vb-audio.com/Cable/)** (or select a secondary monitor display output).
+> 2. Set **CABLE Input** (or your monitor) as the default Windows Output.
+> 3. In Multiout, select **CABLE Output** (or your monitor's loopback) as the input source, and toggle ON all the physical earphones/headphones you want sound to play through. Multiout automatically detects your virtual cable!
 
 ### Install from Source (Linux)
 
@@ -222,10 +239,11 @@ make install
 
 1. **Launch Multiout:** Start the application via your desktop launcher or terminal (`multiout`).
 2. **Select Input Source:**
-   - On Linux, Multiout automatically sets up and selects the **Multiout Virtual Sink**.
-   - Your system audio will stream through this virtual device.
+   - **Linux:** Multiout automatically provisions and selects the **Multiout Virtual Sink**. All desktop audio routes through it seamlessly.
+   - **Windows:** Select your **Virtual Cable** (e.g. `CABLE Output (VB-Audio Virtual Cable)`) or a secondary output's loopback (`System Audio (Default Output)` or monitor loopback).
 3. **Enable Output Devices:**
-   - Toggle the purple switch for each speaker, headphone, or Bluetooth headset you want to output audio to.
+   - Toggle the switch for each speaker, headphone, or Bluetooth headset you want to output audio to.
+   - *Note on Windows:* If you capture an active output device's loopback, routing audio back into that same physical device is automatically blocked or alerted to prevent acoustic feedback loops.
 4. **Calibrate Volume & Delay:**
    - Adjust the **Volume** slider (calibrated in **dB**) for each device to find comfortable listening levels.
    - If one device is delayed (such as Bluetooth), increase the **Delay** slider (in **ms**) on the faster device until the echo disappears.
@@ -239,12 +257,19 @@ make install
 
 ## ❓ Troubleshooting & FAQ
 
+#### Q: On Windows, I hear a duplicate voice / echo on one of my headphones.
+- This occurs when Windows' default playback device is set directly to one of your physical headphones. Windows sends raw audio straight to that headphone's hardware while Multiout also sends resampled audio to it.
+- **Solution:** Set your Windows Default Playback Device to a Virtual Audio Cable (like **VB-Cable**) or a secondary monitor. Then in Multiout, choose that input source and toggle ON your headphones.
+
 #### Q: I don't hear any sound after starting Multiout.
-- Verify that your system's default sound output device is set to **Multiout Virtual Sink** in your OS sound settings.
+- Verify that your system's default sound output device is set to **Multiout Virtual Sink** (Linux) or your **Virtual Audio Cable / Monitor** (Windows) in your OS sound settings. Click the `⚙️ Sound Settings` button in Multiout to open your system settings directly.
 - Ensure at least one output device in Multiout has its toggle switch enabled and its volume is above $-60\text{ dB}$.
 
 #### Q: I hear a slight echo between my Bluetooth headset and wired earphones.
 - Bluetooth headphones introduce intrinsic latency due to wireless encoding. Slide the **Delay** slider on your **wired earphones** up (typically $100\text{--}180\text{ ms}$) until the sound from both aligns simultaneously.
+
+#### Q: I plugged in a new headset while Multiout was running.
+- Click the **🔄 Refresh** button in the top header to discover newly connected playback and capture devices instantly without restarting.
 
 #### Q: How do I inspect diagnostics or underruns?
 - The built-in **Execution logs** terminal at the bottom of the window displays real-time connection status, device enumeration, and buffer underrun warnings. Click **Clear** to reset the view.

@@ -78,7 +78,7 @@ func list(be audio.Backend) {
 			fmt.Printf("  [%d] %s%s\n", i, d.Name, def)
 		}
 	}
-	fmt.Println("\nLook for entries containing \"Monitor\" under capture: that is the system-audio source.")
+	fmt.Println("\nLook for entries containing \"Monitor\", \"System Audio\", or \"Loopback\" under capture: that is the system-audio source.")
 }
 
 func tone(be audio.Backend, a, b string) {
@@ -98,7 +98,7 @@ func tone(be audio.Backend, a, b string) {
 			fatal(fmt.Errorf("device index %d is out of range: only %d playback device(s) available (0 to %d). Run 'make list' to inspect", idx, len(devs), len(devs)-1))
 		}
 		freq := []float64{440, 660}[i] // different pitch per device
-		s, err := be.OpenPlayback("playback:"+idxStr, cfg, sine(freq, cfg, 0.1))
+		s, err := be.OpenPlayback(devs[idx].ID, cfg, sine(freq, cfg, 0.1))
 		if err != nil {
 			fatal(err)
 		}
@@ -163,7 +163,7 @@ func capturePlay(be audio.Backend, capIdxStr, playIdxStr string) {
 	r := engine.NewRing(cfg.SampleRate * cfg.Channels * 2)
 	rd := r.NewReader()
 
-	capStream, err := be.OpenCapture("capture:"+capIdxStr, cfg, func(in []float32) {
+	capStream, err := be.OpenCapture(capDevs[capIdx].ID, cfg, func(in []float32) {
 		r.Write(in)
 	})
 	if err != nil {
@@ -171,7 +171,7 @@ func capturePlay(be audio.Backend, capIdxStr, playIdxStr string) {
 	}
 	defer capStream.Close()
 
-	playStream, err := be.OpenPlayback("playback:"+playIdxStr, cfg, func(out []float32) {
+	playStream, err := be.OpenPlayback(playDevs[playIdx].ID, cfg, func(out []float32) {
 		n := rd.Read(out)
 		for i := n; i < len(out); i++ {
 			out[i] = 0 // fill underrun with silence
@@ -240,7 +240,16 @@ func sinkPlay(outputIndices []string) {
 		}
 	}
 	if virtualSinkMonitor.ID == "" {
-		fatal(fmt.Errorf("could not find monitor of virtual sink in capture devices"))
+		// On Windows (or non-PipeWire), fallback to System Audio Default Loopback
+		for _, d := range capDevs {
+			if d.ID == "loopback:default" || strings.Contains(strings.ToLower(d.Name), "system audio") {
+				virtualSinkMonitor = d
+				break
+			}
+		}
+	}
+	if virtualSinkMonitor.ID == "" {
+		fatal(fmt.Errorf("could not find monitor or system audio loopback in capture devices"))
 	}
 
 	playDevs, err := be.Devices(audio.Playback)

@@ -29,16 +29,29 @@ type VirtualSinkManager interface {
 	CleanupStale() error
 }
 
-// CheckFeedbackRisk verifies whether a capture device is the monitor source
+// CheckFeedbackRisk verifies whether a capture device is the monitor or loopback source
 // of a specified playback device.
 func CheckFeedbackRisk(captureDev Device, playbackDev Device) bool {
 	capName := strings.ToLower(captureDev.Name)
 	playName := strings.ToLower(playbackDev.Name)
 
-	if !strings.Contains(capName, "monitor") {
-		return false
+	// 1. Linux monitor check
+	if strings.Contains(capName, "monitor") {
+		return strings.Contains(capName, playName)
 	}
 
-	// Direct match of playback device name within the monitor name
-	return strings.Contains(capName, playName)
+	// 2. Windows device-specific loopback check
+	if strings.Contains(capName, "loopback") {
+		cleanCap := strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(capName, "(loopback)", ""), "[loopback]", ""))
+		if cleanCap != "" && (strings.Contains(cleanCap, playName) || strings.Contains(playName, cleanCap)) {
+			return true
+		}
+	}
+
+	// 3. System Audio Default loopback check
+	if captureDev.ID == "loopback:default" && playbackDev.IsDefault {
+		return true
+	}
+
+	return false
 }

@@ -2,6 +2,8 @@ package ui
 
 import (
 	"image/color"
+	"net/url"
+	"runtime"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -24,13 +26,15 @@ type MainWindow struct {
 	themeBtn   *widget.Button
 	logConsole *LogConsole
 
-	titleText    *canvas.Text
-	subTitleText *canvas.Text
-	startPill    *canvas.Rectangle
-	inputBg      *canvas.Rectangle
-	outputBg     *canvas.Rectangle
-	cards        []*DeviceCard
-	srcCards     []*SourceCard
+	titleText      *canvas.Text
+	subTitleText   *canvas.Text
+	startPill      *canvas.Rectangle
+	inputBg        *canvas.Rectangle
+	outputBg       *canvas.Rectangle
+	sinkBannerBox  *fyne.Container
+	sinkBannerBg   *canvas.Rectangle
+	cards          []*DeviceCard
+	srcCards       []*SourceCard
 }
 
 // NewMainWindow creates and initializes the user interface.
@@ -106,7 +110,23 @@ func NewMainWindow(app fyne.App, ctrl *Controller) *MainWindow {
 	m.startPill.StrokeColor = p.Border
 	startPillBox := container.NewStack(m.startPill, container.NewPadded(startPillRow))
 
+	soundSettingsBtn := widget.NewButton("⚙️ Sound Settings", func() {
+		_ = m.ctrl.OpenSoundSettings()
+	})
+	soundSettingsBtn.Importance = widget.LowImportance
+
+	refreshBtn := widget.NewButtonWithIcon("🔄 Refresh", theme.ViewRefreshIcon(), func() {
+		_ = m.ctrl.RefreshDevices()
+		m.rebuildSourceCards()
+		m.rebuildDeviceCards()
+		m.updateWindowsSinkBanner()
+		m.ctrl.Logger.Log("[UI] Refreshed audio devices.")
+	})
+	refreshBtn.Importance = widget.LowImportance
+
 	rightControls := container.NewHBox(
+		container.NewCenter(refreshBtn),
+		container.NewCenter(soundSettingsBtn),
 		container.NewCenter(m.themeBtn),
 		container.NewCenter(startPillBox),
 	)
@@ -140,8 +160,14 @@ func NewMainWindow(app fyne.App, ctrl *Controller) *MainWindow {
 	)
 	inputScroll := container.NewVScroll(inputScrollContent)
 
+	inputTop := container.NewVBox(inputHeader)
+	if runtime.GOOS == "windows" {
+		inputTop.Add(m.buildWindowsSinkBanner())
+		inputTop.Add(m.createVerticalSpacer(6))
+	}
+
 	inputContainer := container.NewBorder(
-		inputHeader, nil, nil, nil,
+		inputTop, nil, nil, nil,
 		inputScroll,
 	)
 	m.inputBg = canvas.NewRectangle(p.ContainerBg)
@@ -287,6 +313,7 @@ func (m *MainWindow) applyThemeMode(mode ThemeMode) {
 
 	m.logConsole.UpdateTheme()
 	m.startStop.Refresh()
+	m.updateWindowsSinkBanner()
 
 	for _, sc := range m.srcCards {
 		sc.UpdateTheme()
@@ -296,6 +323,78 @@ func (m *MainWindow) applyThemeMode(mode ThemeMode) {
 	}
 
 	m.win.Content().Refresh()
+}
+
+func (m *MainWindow) buildWindowsSinkBanner() fyne.CanvasObject {
+	m.sinkBannerBox = container.NewVBox()
+	m.updateWindowsSinkBanner()
+	return m.sinkBannerBox
+}
+
+func (m *MainWindow) updateWindowsSinkBanner() {
+	if runtime.GOOS != "windows" || m.sinkBannerBox == nil {
+		return
+	}
+	m.sinkBannerBox.Objects = nil
+
+	p := GetPalette()
+	vName := m.ctrl.VirtualSinkName()
+
+	if vName != "" {
+		bannerBg := canvas.NewRectangle(p.CardBg)
+		bannerBg.CornerRadius = 8
+		bannerBg.StrokeWidth = 1
+		bannerBg.StrokeColor = p.Accent
+
+		titleLbl := widget.NewLabelWithStyle("✓ Virtual Sink: "+vName, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+		infoLbl := widget.NewLabelWithStyle("Set this as Windows Default Output in Sound Settings to route all PC audio without dual voice.", fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
+		infoLbl.Wrapping = fyne.TextWrapWord
+
+		soundBtn := widget.NewButtonWithIcon("⚙️ Sound Settings", theme.SettingsIcon(), func() {
+			_ = m.ctrl.OpenSoundSettings()
+		})
+		soundBtn.Importance = widget.LowImportance
+
+		bannerContent := container.NewVBox(
+			titleLbl,
+			infoLbl,
+			container.NewHBox(soundBtn),
+		)
+
+		m.sinkBannerBg = bannerBg
+		m.sinkBannerBox.Add(container.NewStack(bannerBg, container.NewPadded(bannerContent)))
+	} else {
+		bannerBg := canvas.NewRectangle(p.CardBg)
+		bannerBg.CornerRadius = 8
+		bannerBg.StrokeWidth = 1
+		bannerBg.StrokeColor = p.Border
+
+		titleLbl := widget.NewLabelWithStyle("💡 Windows Audio Routing Tip", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+		infoLbl := widget.NewLabelWithStyle("To route all Windows audio to multiple devices without dual-playback echo on your default speaker, install a Virtual Audio Cable (e.g. VB-Cable).", fyne.TextAlignLeading, fyne.TextStyle{})
+		infoLbl.Wrapping = fyne.TextWrapWord
+
+		getCableBtn := widget.NewButtonWithIcon("🌐 Get VB-Cable (Free)", theme.NavigateNextIcon(), func() {
+			if u, err := url.Parse("https://vb-audio.com/Cable/"); err == nil {
+				_ = m.app.OpenURL(u)
+			}
+		})
+		getCableBtn.Importance = widget.LowImportance
+
+		soundBtn := widget.NewButtonWithIcon("⚙️ Sound Settings", theme.SettingsIcon(), func() {
+			_ = m.ctrl.OpenSoundSettings()
+		})
+		soundBtn.Importance = widget.LowImportance
+
+		bannerContent := container.NewVBox(
+			titleLbl,
+			infoLbl,
+			container.NewHBox(getCableBtn, soundBtn),
+		)
+
+		m.sinkBannerBg = bannerBg
+		m.sinkBannerBox.Add(container.NewStack(bannerBg, container.NewPadded(bannerContent)))
+	}
+	m.sinkBannerBox.Refresh()
 }
 
 // ShowAndRun displays the window.

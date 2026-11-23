@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strings"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
@@ -27,7 +29,7 @@ func NewSourceCard(dev audio.Device, isSelected bool, onSelected func(dev audio.
 	}
 
 	title := dev.Name
-	if dev.IsDefault {
+	if dev.IsDefault && !strings.Contains(strings.ToLower(title), "default") {
 		title += " (Default)"
 	}
 	card.nameLabel = widget.NewLabelWithStyle(title, fyne.TextAlignLeading, fyne.TextStyle{Bold: isSelected})
