@@ -70,6 +70,9 @@ installer: exe
 	@if command -v iscc >/dev/null 2>&1; then \
 		iscc installer/multiout.iss; \
 		echo "Created Inno Setup installer: bin/multiout_setup_x64.exe"; \
+	elif [ -f "$$LOCALAPPDATA/Programs/Inno Setup 6/ISCC.exe" ]; then \
+		"$$LOCALAPPDATA/Programs/Inno Setup 6/ISCC.exe" installer/multiout.iss; \
+		echo "Created Inno Setup installer: bin/multiout_setup_x64.exe"; \
 	elif [ -f "C:/Program Files (x86)/Inno Setup 6/ISCC.exe" ]; then \
 		"C:/Program Files (x86)/Inno Setup 6/ISCC.exe" installer/multiout.iss; \
 		echo "Created Inno Setup installer: bin/multiout_setup_x64.exe"; \

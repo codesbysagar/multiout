@@ -2,7 +2,7 @@
 ; To compile: iscc installer\multiout.iss
 
 #define MyAppName "Multiout"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "codesbysagar"
 #define MyAppURL "https://github.com/codesbysagar/multiout"
 #define MyAppExeName "multiout.exe"
@@ -18,7 +18,6 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-LicenseFile=..\LICENSE
 OutputDir=..\bin
 OutputBaseFilename=multiout_setup_x64
 Compression=lzma2/max
@@ -37,7 +36,6 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "..\bin\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\internal\ui\multiout-logo-rounded.png"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]

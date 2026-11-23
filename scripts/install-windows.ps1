@@ -45,7 +45,9 @@ if (!(Test-Path $installDir)) {
 Copy-Item -Path $exePath -Destination $installDir -Force
 Copy-Item -Path (Join-Path $projectRoot "internal\ui\multiout-logo-rounded.png") -Destination $installDir -Force
 Copy-Item -Path (Join-Path $projectRoot "README.md") -Destination $installDir -Force
-Copy-Item -Path (Join-Path $projectRoot "LICENSE") -Destination $installDir -Force
+if (Test-Path (Join-Path $projectRoot "LICENSE")) {
+    Copy-Item -Path (Join-Path $projectRoot "LICENSE") -Destination $installDir -Force
+}
 
 $installedExe = Join-Path $installDir "multiout.exe"
 Write-Host "Installed files successfully." -ForegroundColor Green
